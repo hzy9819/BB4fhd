@@ -12,7 +12,8 @@ void * worker(void * s) {
     // if(0 != access(res_dir, 0)) {
     //     mkdir(res_dir, S_IRWXO);
     // }
-    string res_dir = std::string(result_prefix) + std::string(ub) + std::string(lb) + std::to_string(TIMEOUTSEC);
+    // string res_dir = std::string(result_prefix) + std::string(ub) + std::string(lb) + std::to_string(TIMEOUTSEC);
+    string res_dir = string(result_prefix);
     fres = fopen((res_dir + "/" + file_name + ".res").c_str(), "w");
 #else
     fres = stdout;

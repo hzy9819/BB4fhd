@@ -21,8 +21,8 @@
 #define HLOG
 
 // #define LOW_DELTA2
-// #define LOW_GAMMAR
-#define LOW_MMDP
+#define LOW_GAMMAR
+// #define LOW_MMDP
 #define UP_MINW
 
 #include <time.h>
