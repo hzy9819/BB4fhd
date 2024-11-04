@@ -15,14 +15,8 @@
 #define db double
 #define LOG2(X) ((unsigned) (8*sizeof (unsigned long long) - __builtin_clzll((X)) - 1))
 
-using namespace std;
+// using namespace std;
 
-
-// typedef EdgeBit = bitset <MAXELENUM>;
-// typedef VetexSet = bitset <MAXELENUM> ;
-
-// typedef Edge = uint64_t;
-// typedef VertexSet = uint64_t;
 
 const uint64_t m1  = 0x5555555555555555; //binary: 0101...
 const uint64_t m2  = 0x3333333333333333; //binary: 00110011..
@@ -37,25 +31,26 @@ struct Width;
 struct HyperG;
 struct Hvalue;
 
-typedef pair<VertexSet, VertexSet> Hstate;
+typedef std::pair<VertexSet, VertexSet> Hstate;
+typedef std::vector<size_t> Order;
 
 struct Width {
     db width;
-    vector <size_t> order;
-    vector < pair<VertexSet, db> > Bag;
+    std::vector <size_t> o;
+    std::vector < std::pair<VertexSet, db> > Bag;
 
     Width(): width(1e7) {}
     Width(db w): width(w) {}
-    Width(db w, const vector <size_t> & o) {
+    Width(db w, const std::vector <size_t> & o_) {
         width = w;
-        order = o;
+        o = o_;
     }
 
     void push(size_t x) {
-        order.push_back(x);
+        o.push_back(x);
     }
     void pop() {
-        order.pop_back();
+        o.pop_back();
     }
     void set_width(db _w) {
         width = _w;
@@ -70,9 +65,9 @@ struct Width {
     }
 
     Width operator + (Width & x) const {
-        Width res(max(width, x.width));
-        res.order = order;
-        res.order.insert(res.order.end(), x.order.begin(), x.order.end());
+        Width res(std::max(width, x.width));
+        res.o = o;
+        res.o.insert(res.o.end(), x.o.begin(), x.o.end());
 #ifdef OUTPUT_BAG
         res.Bag = Bag;
         res.Bag.insert(res.Bag.end(), x.Bag.begin(), x.Bag.end());
@@ -80,7 +75,7 @@ struct Width {
         return res;
     }
 
-    size_t size() { return order.size(); }
+    size_t size() { return o.size(); }
 };
 
 struct VertexSet {
@@ -93,12 +88,12 @@ struct VertexSet {
         for(size_t i = 0; i < UINT64NUM; ++i)
             S[i] = _s[i];
     }
-    VertexSet(vector <size_t> & v) {
+    VertexSet(std::vector <size_t> & v) {
         memset(S, 0, sizeof S);
         for(auto it = v.begin(); it != v.end(); ++it)
             this->Set(*it);
     }
-    VertexSet(set <size_t> & v) {
+    VertexSet(std::set <size_t> & v) {
         memset(S, 0, sizeof S);
         for(auto it = v.begin(); it != v.end(); ++it)
             this->Set(*it);
@@ -124,6 +119,11 @@ struct VertexSet {
         (*this).Xor(V);
     }
 
+    void clear() {
+        for(size_t i = 0; i < UINT64NUM; ++i)
+            S[i] = 0;
+    }
+
     bool test(size_t pos) {
         size_t div = pos / 64, mod = pos % 64;
         if(div >= UINT64NUM) return false;
@@ -142,7 +142,8 @@ struct VertexSet {
         S[div] = (S[div] | (1ULL << mod)) ^ (1ULL << mod);
     }
 
-    void getelement(vector <size_t> & V) {
+    void getelement(std::vector <size_t> & V) {
+        V.clear();
         for(size_t i = 0; i < UINT64NUM; ++i) {
             uint64_t x = S[i], y;
             for(; x; x = y) {
@@ -244,22 +245,22 @@ struct HyperG {
         __PrimalG: primal graph 
     */
     size_t N, M;
-    vector <VertexSet> e;
-    vector <VertexSet> __PrimalG;
+    std::vector <VertexSet> e;
+    std::vector <VertexSet> __PrimalG;
 
    HyperG() : N(0) {
        M = 0;
    }
    HyperG(size_t N_): N(N_) {}
-   HyperG(size_t N_, vector <set<string> > & v, map <string, size_t> & f);
-   HyperG(VertexSet S, vector<VertexSet> & v);
+   HyperG(size_t N_, std::vector <std::set<std::string> > & v, std::map <std::string, size_t> & f);
+   HyperG(VertexSet S, std::vector<VertexSet> & v);
 
    ~HyperG() {
        e.clear();
        __PrimalG.clear();
    }
 
-    vector <VertexSet> & PrimalG();
+    std::vector <VertexSet> & PrimalG();
     HyperG induced(VertexSet S);
 };
 

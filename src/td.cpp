@@ -8,8 +8,97 @@
 #include "SCsolver.h"
 #include <glpk.h>
 
+using namespace std;
+
+FHD::FHD(HyperG & H, vector <size_t> o) {
+    vector <VertexSet> E = H.e;
+    vector <VertexSet> e;
+    for(size_t i = 0; i < o.size(); ++i) {
+        VertexSet ei;
+        for(size_t j = i + 1; j < o.size(); ++j) {
+            for(auto e_: E) 
+                if(e_.test(o[i]) && e_.test(o[j])) {
+                    ei.Set(o[j]);
+                    break;
+                }
+        }
+        e.push_back(ei);
+        E.push_back(ei);
+        ei.Set(o[i]);
+        X.push_back(ei);
+    }
+    for(size_t i = 0; i < o.size(); ++i)
+        for(size_t j = i + 1; j < o.size(); ++j)
+            if(X[j].subset(e[i])) {
+                eg.push_back(make_pair(i, j));
+                break;
+            }
+}
+
+void FHD::Refine() {
+    bool flag = true;
+    while(flag) {
+        flag = false;
+        for(auto ei: eg) {
+            size_t p = ei.first, q = ei.second;
+            if(X[p].none() || X[q].none() || p == q)
+                continue;
+            if(X[p].subset(X[q])) { // merge q to p
+                flag = true;
+                for(auto & ej: eg) {
+                    if(ej.first == q)
+                        ej.first = p;
+                    if(ej.second == q)
+                        ej.second = p;
+                }
+                X[q].clear();
+                break;
+            }
+            else if(X[q].subset(X[p])) {
+                swap(p, q);
+                flag = true;
+                for(auto & ej: eg) {
+                    if(ej.first == q)
+                        ej.first = p;
+                    if(ej.second == q)
+                        ej.second = p;
+                }
+                X[q].clear();
+                break;
+            }
+        }
+    }
+
+    vector< pair<size_t, size_t> > _eg;
+    vector< VertexSet > _X;
+    map<size_t, size_t> remap;
+    size_t cnt = 0;
+
+    for(size_t i = 0; i < X.size(); ++i)
+        if(!X[i].none()) {
+            _X.push_back(X[i]);
+            remap[i] = cnt++;
+        }
+    for(size_t i = 0; i < eg.size(); ++i)
+        if(eg[i].first != eg[i].second) {
+            pair<size_t, size_t> tmp = make_pair(remap[eg[i].first], remap[eg[i].second]);
+            if(tmp.first == tmp.second)
+                continue;
+            if(tmp.first > tmp.second)
+                swap(tmp.first, tmp.second);
+            _eg.push_back(tmp);
+        }
+    
+    sort(_eg.begin(), _eg.end()); // de-duplicate edges
+    auto last = unique(_eg.begin(), _eg.end());
+    _eg.erase(last, _eg.end());
+
+    X = _X;
+    eg = _eg;
+}
+
 void FineTuneOrder(HyperG & H, Width & ans, vector <VertexSet> & E) {
-    vector <size_t> o = ans.order;
+    vector <size_t> o = ans.o;
     db width = ans.width, w[o.size()];
 
     while(1) {
@@ -311,9 +400,93 @@ db FindSimplicalVertex(VertexSet S, vector <VertexSet> & E, SCsolver & Sv, vecto
     return low;
 }
 
-db DPFHD(HyperG & H, FILE * f) {
+db DPFHD(HyperG & H, FILE * f, Order & up_o) {
     map <VertexSet, db> FHW[H.N + 1];
+    map <VertexSet, Order> o[H.N + 1];
+    VertexSet Uniset, InitS;
+    for(size_t i = 0; i < H.N; ++i)
+        Uniset.Set(i);
+    
+    SCsolver Sv(H.e);
+
+    FHW[0][InitS] = 1.;
+    o[0][InitS] = Order();
+
+#ifdef TIMEOUT
+    clock_t begin = clock();
+#endif
+
+    if(H.N >= 25) {
+        fprintf(f, "Timeout terminate\n");
+        return H.N;
+    }
+
+    for(size_t i = 0; i < H.N; ++i) {
+        if(i) {
+            FHW[i - 1].clear();
+            o[i - 1].clear();
+        }
+        for(auto it = FHW[i].begin(); it != FHW[i].end(); it++) {
+#ifdef TIMEOUT
+            if(clock() - begin >= time_out) {
+                fprintf(f, "Timeout terminate\n");
+                return H.N;
+            }
+#endif     
+            VertexSet S = it->first;
+            vector <size_t> V;
+            vector <VertexSet> E = H.e;
+
+            for(size_t j = 0; j < H.N; ++j) 
+                if(S.test(j)) {
+                    VertexSet ei = Aggregation(j, E);
+                    ei.reset(j);
+                    E.push_back(ei);
+                }
+                else
+                    V.push_back(j);
+
+            CleanEdge(S ^ Uniset, E);
+
+            for(auto vit = V.begin(); vit != V.end(); ++vit) {
+                
+#ifdef TIMEOUT
+                if(clock() - begin >= time_out) {
+                    fprintf(f, "Timeout terminate\n");
+                    return H.N;
+                }
+#endif
+                VertexSet tmpS = S;
+                tmpS.Set(*vit);
+                VertexSet CS = tmpS ^ Uniset;
+
+                VertexSet ei = Aggregation(*vit, E);
+                ei.intersect(CS);
+                ei.Set(*vit);
+                db w = Sv.solve(ei);
+                w = max(w, it->second);
+
+                if(FHW[i + 1].count(tmpS) && FHW[i + 1][tmpS] <= w + eps)
+                    continue;
+
+                FHW[i + 1][tmpS] = w;
+                o[i + 1][tmpS] = o[i][S];
+                o[i + 1][tmpS].push_back(*vit);
+            }       
+        }
+    }
+#ifdef TIMEOUT
+    fprintf(f, "running_time: %lfs\n", (db) (clock() - begin) / CLOCKS_PER_SEC);
+#endif
+    up_o = o[H.N][Uniset];
+    return FHW[H.N][Uniset];
+}
+
+db DPFHDBB(HyperG & H, FILE * f, Order & up_o) {
+    map <VertexSet, db> FHW[H.N + 1];
+    map <VertexSet, Order> o[H.N + 1];
     map <VertexSet, pair<db, db> > Bnd[H.N + 1];
+    map <VertexSet, Order> UB_o[H.N + 1];
     VertexSet Uniset;
     vector <size_t> SimplicalVertex;
     // FHW[0][Uniset] = 0;
@@ -322,7 +495,11 @@ db DPFHD(HyperG & H, FILE * f) {
 
     SCsolver Sv(H.e);
 
-    db up = Sv.solve(Uniset), bt;
+    db up = H.N, bt;
+    up = Sv.solve(Uniset);
+
+    for(size_t i = 0; i < H.N; ++i)
+        up_o.push_back(i);
     // db bt = Sv.solve(C);
     // Uniset.Xor(C); // arrange clique C to the end
 
@@ -330,14 +507,25 @@ db DPFHD(HyperG & H, FILE * f) {
 #ifdef PRINTSTATENUMBER
     size_t total_state = 0;
 #endif
+
+#ifdef SLMPV
     db low = FindSimplicalVertex(Uniset, H.e, Sv, SimplicalVertex);
     VertexSet InitS(SimplicalVertex);
     size_t cnt = SimplicalVertex.size();
+#else
+    db low = 0;
+    VertexSet InitS;
+    size_t cnt = 0;
+#endif
 
-    VertexSet C = MaximalClique(H, InitS);
+    VertexSet C;
+    if(H.N <= FINDCLIQUELIMIT)
+        C = MaximalClique(H, InitS);
+    printf("find clique with size %lu\n", C.size());
     bt = max(1., max(Sv.solve(C), low));
 
     FHW[cnt][InitS] = max(low, 1.);
+    o[cnt][InitS] = Order();
 
 #ifdef TIMEOUT
     clock_t begin = clock();
@@ -347,10 +535,15 @@ db DPFHD(HyperG & H, FILE * f) {
 #ifdef PRINTSTATENUMBER
         total_state += FHW[i].size();
 #endif
-        if(i)
+        if(i) {
             FHW[i - 1].clear(); // shrink memory
+            o[i - 1].clear();
+            Bnd[i - 1].clear();
+            UB_o[i - 1].clear();
+        }
         for(auto it = FHW[i].begin(); it != FHW[i].end(); it++) {
             pair <db, db> bnd;
+            Order tmp_o;
             if(Bnd[i].count(it->first))
                 bnd = Bnd[i][it->first];
             else
@@ -383,6 +576,7 @@ db DPFHD(HyperG & H, FILE * f) {
                     V.push_back(j);
 
             CleanEdge(S ^ Uniset, E);
+#ifdef SLMPV
             low = FindSimplicalVertex(S ^ Uniset ^ C, E, Sv, SimplicalVertex);
             if(low > 0) {
                 VertexSet tmpS = S;
@@ -398,18 +592,29 @@ db DPFHD(HyperG & H, FILE * f) {
                 FHW[i + cnt][tmpS] = low;
                 continue;
             }
-
+#endif
             
             for(auto vit = V.begin(); vit != V.end(); ++vit) {
+                
+#ifdef TIMEOUT
+                if(clock() - begin >= time_out) {
+                    fprintf(f, "Timeout terminate\n");
+#ifdef PRINTSTATENUMBER
+                    fprintf(f, "total_state_number = %lu\n", total_state);
+#endif
+                    return up;
+                }
+#endif
                 VertexSet tmpS = S;
                 tmpS.Set(*vit);
                 VertexSet CS = tmpS ^ Uniset;
-               
+                tmp_o.clear();
 
                 VertexSet ei = Aggregation(*vit, E);
                 ei.intersect(CS);
                 ei.Set(*vit);
                 db w = Sv.solve(ei);
+
                 if(w >= up - eps)
                     continue;
 
@@ -422,6 +627,8 @@ db DPFHD(HyperG & H, FILE * f) {
                 bnd = make_pair(0, H.N + 1);
                 if(Bnd[i + 1].count(tmpS))
                     bnd = Bnd[i + 1][tmpS];
+                if(UB_o[i + 1].count(tmpS))
+                    tmp_o = UB_o[i + 1][tmpS];
 
                 do {
                     if(bnd.first < 1)
@@ -433,16 +640,22 @@ db DPFHD(HyperG & H, FILE * f) {
                     }
 
                     if(bnd.second > H.N)
-                        bnd.second = FHW_ub(CS, E, Sv);
+                        bnd.second = FHW_ub(CS, E, Sv, tmp_o);
 
                     Bnd[i + 1][tmpS] = bnd;
+                    UB_o[i + 1][tmpS] = tmp_o;
 
                     if(max(w, bnd.second) <= up - eps) {
                         up = max(w, bnd.second);
+                        up_o = o[i][S];
+                        up_o.push_back(*vit);
+                        up_o.insert(up_o.end(), tmp_o.begin(), tmp_o.end());
                         fprintf(f, "update ub = %lf update_time: %lfs\n", up, (db) (clock() - begin) / CLOCKS_PER_SEC);
-// #ifdef TIMEOUT
-//                         begin = clock();
-// #endif
+                        fprintf(f, "state = %lu, vertex = %lu\n", i, *vit);
+                        fprintf(f, "update elim order: ");
+                        for(auto v: up_o) 
+                            fprintf(f, "%lu ", v);
+                        fprintf(f, "\n");
                         if(up + eps <= bt)
                             return up;
                     }
@@ -451,6 +664,8 @@ db DPFHD(HyperG & H, FILE * f) {
                     //     break;
 
                     FHW[i + 1][tmpS] = w;
+                    o[i + 1][tmpS] = o[i][S];
+                    o[i + 1][tmpS].push_back(*vit);
                 } while(0);
                 E.pop_back();
             }

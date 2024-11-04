@@ -2,6 +2,7 @@
 #define HYPERGRAPH_HZY_CPP
 #include "hypergraph.h"
 
+using namespace std;
 HyperG::HyperG(size_t N_, vector <set<string> > & v, map <string, size_t> & f) : N(N_) {
     /*
             construct Hypergraph via a group of string set with number mapping given

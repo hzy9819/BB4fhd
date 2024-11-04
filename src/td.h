@@ -4,7 +4,17 @@
 
 #include "hypergraph.h"
 
-void EnumOrderFHD(HyperG & H, vector <size_t> & V, Width & current_ans, Width & optimal_ans, vector <VertexSet> & E, VertexSet suffix);
+struct FHD {
+    std::vector< std::pair<size_t, size_t> > eg;
+    std::vector< VertexSet > X;
+
+    void Refine();
+
+    FHD() {}
+    FHD(HyperG & H, std::vector <size_t> o);
+};
+
+void EnumOrderFHD(HyperG & H, std::vector <size_t> & V, Width & current_ans, Width & optimal_ans, std::vector <VertexSet> & E, VertexSet suffix);
 
 /*
     Divide and conquer set method for fhd:
@@ -17,10 +27,11 @@ void EnumOrderFHD(HyperG & H, vector <size_t> & V, Width & current_ans, Width & 
 
 */
 
-void DivOrderFHD(HyperG & H, Hstate S, vector <size_t> & V, Width & optimal_ans, vector <VertexSet> & E, bool ckf, clock_t start_time);
+void DivOrderFHD(HyperG & H, Hstate S, std::vector <size_t> & V, Width & optimal_ans, std::vector <VertexSet> & E, bool ckf, clock_t start_time);
 
-db DPFHD(HyperG & H, FILE * f);
+db DPFHD(HyperG & H, FILE * f, Order & up_o);
 
+db DPFHDBB(HyperG & H, FILE * f, Order & up_o);
 
 
 #endif

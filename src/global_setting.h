@@ -5,13 +5,17 @@
 #define TIMEOUT
 #define PREPROCESS
 #define PRINTSTATENUMBER
-#define DIVBICCP
+// #define DIVBICCP
 // #define IDV_TEST
 // #define ENUM
 // #define CHECKF
 // #define DVO
 #define DPOD
 #define STATISTIC
+#define OUTPUTTD
+// #define SLMPV
+#define SCACC
+#define BnB
 
 // #define DIVAPPROX
 // #define BYCOVER
@@ -36,11 +40,12 @@ const size_t mem_lim = 20;
 const size_t UINT64NUM = 20;
 const size_t MAXBITNUMBER = UINT64NUM * 64;
 const size_t MAXELENUM = MAXBITNUMBER;
-const size_t TIMEOUTSEC = 7200;
+const size_t FINDCLIQUELIMIT = 1000;
+const size_t TIMEOUTSEC = 60;
 const clock_t time_out = CLOCKS_PER_SEC * TIMEOUTSEC;
 
 
-const char * const result_prefix = "../../result/dp_";
+const char * const result_prefix = "../result";
 #ifdef UP_MINW
 const char * const ub = "minw_";
 #else 
@@ -64,8 +69,8 @@ const char * const lb = "nolb_";
 // std::string const & temp = std::string(result_prefix) + std::string(ub) + std::string(lb) + std::to_string(TIMEOUTSEC);
 // const char * const res_dir = (std::string(result_prefix) + std::string(ub) + std::string(lb) + std::to_string(TIMEOUTSEC)).c_str();
 // #define res_dir (std::string(result_prefix) + std::string(ub) + std::string(lb) + std::to_string(TIMEOUTSEC)).c_str()
-const char * const data_dir = "../../data/hyperbench";
-const char * const idv_file = "../../idv.txt";
+const char * const data_dir = "../sample";
+const char * const idv_file = "./idv.txt";
 
 
 const size_t worker_num = 30;

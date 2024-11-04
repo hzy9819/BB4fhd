@@ -27,12 +27,15 @@ size_t MinFHW(VertexSet S, vector <VertexSet> E, SCsolver & Sv) {
     return ans;
 }
 
-db GreedyMinFHW(VertexSet S, vector <VertexSet> E, SCsolver & Sv) {
+db GreedyMinFHW(VertexSet S, vector <VertexSet> E, SCsolver & Sv, Order & o) {
     vector <size_t> V;
     S.getelement(V);
 
-    if(V.size() < 2)
+    if(V.size() < 2) {
+        for(size_t i = 0; i < V.size(); ++i)
+            o.push_back(V[i]);
         return 1.;
+    }
 
     VertexSet Ne[MAXELENUM];
     db width[MAXELENUM];
@@ -47,15 +50,6 @@ db GreedyMinFHW(VertexSet S, vector <VertexSet> E, SCsolver & Sv) {
     }
 
     db res = 1.;
-    // for(size_t i = 0; i < V.size() - 1; ++i) {
-    //     size_t v = MinFHW(S, E, Sv);
-    //     VertexSet ei = Aggregation(v, E);
-    //     ei.intersect(S);
-    //     res = max(res, Sv.solve(ei));
-    //     ei.reset(v);
-    //     S.reset(v);
-    //     E.push_back(ei);
-    // }
 
     for(size_t i = 0; i < V.size() - 1; ++i) {
         pair<db, size_t> tmp = Q.top(); Q.pop();
@@ -64,6 +58,7 @@ db GreedyMinFHW(VertexSet S, vector <VertexSet> E, SCsolver & Sv) {
             Q.pop();
         }
         size_t u = tmp.second;
+        o.push_back(u);
         res = max(res, -tmp.first);
         Ne[u].reset(u);
         S.reset(u);
@@ -84,13 +79,15 @@ db GreedyMinFHW(VertexSet S, vector <VertexSet> E, SCsolver & Sv) {
             width[v] = w;
         }
     }
+    S.getelement(V);
+    o.push_back(V[0]);
 
     return res;
 }
 
-db FHW_ub(VertexSet S, vector <VertexSet> E, SCsolver & Sv) {
+db FHW_ub(VertexSet S, vector <VertexSet> E, SCsolver & Sv, Order & o) {
 #ifdef UP_MINW
-    return GreedyMinFHW(S, E, Sv);
+    return GreedyMinFHW(S, E, Sv, o);
 #else
     return Sv.solve(S);
 #endif

@@ -2,13 +2,17 @@
 #define PREPROCESSING_HZY_CPP
 #include "hypergraph.h"
 
+using namespace std;
+
 bool DelDegree1Vertex(HyperG & H);
 bool DelCoveredEdge(HyperG & H);
 bool DelCoveredEdge(HyperG & H);
 
-bool InducedHyperG(HyperG & H, vector <size_t> & remain_vertex) {
+bool InducedHyperG(HyperG & H, vector <size_t> & remain_vertex, map<size_t, size_t> & Vres_map) {
     if(remain_vertex.size() == H.N)
         return 0;
+    
+    map<size_t, size_t> new_map;
 
     size_t new_N = remain_vertex.size();
 
@@ -16,6 +20,7 @@ bool InducedHyperG(HyperG & H, vector <size_t> & remain_vertex) {
         VertexSet temp;
         for(size_t i = 0; i < remain_vertex.size(); ++i) { // re-numbered
             size_t v = remain_vertex[i];
+            new_map[i] = Vres_map[v];
             if((*it).test(v))
                 temp.Set(i);
         }
@@ -23,6 +28,7 @@ bool InducedHyperG(HyperG & H, vector <size_t> & remain_vertex) {
     }
 
     H.N = new_N;   
+    Vres_map = new_map;
     return 1;
 }
 
@@ -33,7 +39,7 @@ bool InducedHyperG(HyperG & H, vector <size_t> & remain_vertex) {
     return true if delete happens
 */
 
-bool DelDegree1Vertex(HyperG & H) {
+bool DelDegree1Vertex(HyperG & H, Order & prefix_o, map<size_t, size_t> & Vres_map) {
     size_t dgr[H.N];
     memset(dgr, 0, sizeof dgr);
 
@@ -48,8 +54,10 @@ bool DelDegree1Vertex(HyperG & H) {
     for(size_t i = 0; i < H.N; ++i)
         if(dgr[i] > 1) 
             remain_vertex.push_back(i);
+        else 
+            prefix_o.push_back(Vres_map[i]);
 
-    return InducedHyperG(H, remain_vertex);
+    return InducedHyperG(H, remain_vertex, Vres_map);
 }
 
 /*
@@ -87,7 +95,7 @@ bool DelCoveredEdge(HyperG & H) {
     we only need to keep one
 */
 
-bool DelISOVertex(HyperG & H) {
+bool DelISOVertex(HyperG & H, Order & prefix_o, map<size_t, size_t> & Vres_map) {
     VertexSet ve[H.N];
 
     size_t i = 0, j = 0;
@@ -113,22 +121,24 @@ bool DelISOVertex(HyperG & H) {
         }
         if(!flag)
             remain_vertex.push_back(i);
+        else 
+            prefix_o.push_back(Vres_map[i]);
     }
 
-    return InducedHyperG(H, remain_vertex);
+    return InducedHyperG(H, remain_vertex, Vres_map);
 
 }
 
 
-void Preprocessing(HyperG & H) {
+void Preprocessing(HyperG & H, Order & prefix_o, map<size_t, size_t> & Vres_map) {
     DelCoveredEdge(H);
-    DelDegree1Vertex(H);
-    DelISOVertex(H);
+    DelDegree1Vertex(H, prefix_o, Vres_map);
+    DelISOVertex(H, prefix_o, Vres_map);
 
     while(1) { // until noting happened
         if(!DelCoveredEdge(H))
             break;
-        if(!DelDegree1Vertex(H) && !DelISOVertex(H))
+        if(!DelDegree1Vertex(H, prefix_o, Vres_map) && !DelISOVertex(H, prefix_o, Vres_map))
             break;
     }
 }

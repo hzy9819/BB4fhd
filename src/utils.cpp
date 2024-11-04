@@ -150,7 +150,7 @@ inline vector < set < size_t > > InducedHyperG(vector < set < size_t > > & E, se
     return IndE ;
 }
 
-inline HyperG BuildHyperGraph(const char * file_name) {
+inline HyperG BuildHyperGraph(const char * file_name, map<size_t, string> & vname) {
     /*
         the data should be organized as edge_name(element 1, element 2, ...), line by line, the detail can refer Hyperbench
     */
@@ -201,9 +201,14 @@ inline HyperG BuildHyperGraph(const char * file_name) {
         v.push_back(temp);
     }
 
-    vector < set < size_t > > E = Numbered(v, f);
-    vector < vector <bool> > AdjM = GetAdjM(cnt, E);
-    vector < set <size_t> > BiComp = BiconnectComp(AdjM);
+    // vector < set < size_t > > E = Numbered(v, f);
+    // vector < vector <bool> > AdjM = GetAdjM(cnt, E);
+    // vector < set <size_t> > BiComp = BiconnectComp(AdjM);
+
+    for(auto it = f.begin(); it != f.end(); ++it) {
+        // cerr << it->second << " " << it->first << endl;
+        vname[it->second] = it->first;
+    }
     
     return HyperG(cnt, v, f);
 }

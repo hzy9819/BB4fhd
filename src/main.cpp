@@ -2,6 +2,7 @@
 #include "preprocessing.cpp"
 #include "td.h"
 #include "utils.cpp"
+#include <filesystem>
 
 using namespace std;
 
@@ -12,14 +13,22 @@ void * worker(void * s) {
     // if(0 != access(res_dir, 0)) {
     //     mkdir(res_dir, S_IRWXO);
     // }
-    // string res_dir = std::string(result_prefix) + std::string(ub) + std::string(lb) + std::to_string(TIMEOUTSEC);
-    string res_dir = string(result_prefix);
-    fres = fopen((res_dir + "/" + file_name + ".res").c_str(), "w");
+    // string res_dir =  std::string(result_prefix) + std::string(ub) + std::string(lb) + std::to_string(TIMEOUTSEC);
+    filesystem::path basePath(result_prefix);
+    // filesystem::path dirPath(std::string(ub) + std::string(lb) + std::to_string(TIMEOUTSEC));
+
+    // string res_dir = "../../result/sample";
+    fres = fopen((basePath / filesystem::path(file_name + ".res")).c_str(), "w");
+#ifdef OUTPUTTD
+    FILE * ftd = fopen((basePath / filesystem::path(file_name + ".td")).c_str(), "w");
+#endif
 #else
     fres = stdout;
 #endif
+    clock_t begin = clock();
     printf("%s: Start Processing\n", file_name.c_str());
-    HyperG H = BuildHyperGraph((string(data_dir) + "/" + file_name).c_str());
+    map<size_t, string> vname;
+    HyperG H = BuildHyperGraph((string(data_dir) + "/" + file_name).c_str(), vname);
 
     if(H.N > MAXBITNUMBER) {
         printf("%s: too large to load!\n", file_name.c_str());
@@ -29,7 +38,16 @@ void * worker(void * s) {
     vector <HyperG> HV;
 
 #ifdef PREPROCESS
-    Preprocessing(H);
+    HyperG H_old = H;
+    Order prefix_o;
+    map<size_t, size_t> Vres_map;
+    for(size_t i = 0; i < H.N; ++i)
+        Vres_map[i] = i;
+    Preprocessing(H, prefix_o, Vres_map);
+    fprintf(fres, "prefix_o: ");
+    for(auto oi: prefix_o)
+        fprintf(fres, "%lu ", oi);
+    fprintf(fres, "\n");
 #ifdef DIVBICCP
     HV = DivBiCCP(H);
     // printf("%s: After preprocessing, %lu BICCP\n", file_name.c_str(), HV.size());
@@ -43,7 +61,7 @@ void * worker(void * s) {
     db fhw = 0.;
     for(size_t i = 0; i < HV.size(); ++i) {
         H = HV[i];
-        // printf("%s: %lu BICCP: n = %lu, m = %lu\n", file_name.c_str(), i, H.N, H.M);
+        printf("%s: %lu BICCP: n = %lu, m = %lu\n", file_name.c_str(), i, H.N, H.M);
         fprintf(fres, "%lu BICCP: n = %lu, m = %lu\n", i, H.N, H.M);
         if(H.N <= 1 || H.M <= 1) {
             fprintf(fres, "%lu BICCP: width = 1.0\n", i);
@@ -61,7 +79,12 @@ void * worker(void * s) {
         // return 0;
 
 #ifdef DPOD
-        db ans = DPFHD(H, fres);
+        Order elim_o;
+#ifdef BnB
+        db ans = DPFHDBB(H, fres, elim_o);
+#else
+        db ans = DPFHD(H, fres, elim_o);
+#endif
         fprintf(fres, "%lu BICCP: width = %lf\n", i, ans);    
         fhw = max(fhw, ans);
 #endif
@@ -101,9 +124,36 @@ void * worker(void * s) {
         calc_width(H, optimal_ans.order, E);
 #endif
         // printf("%lf\n", optimal_ans.width);
+#ifdef PREPROCESS
+        for(size_t i = 0; i < elim_o.size(); ++i)
+            elim_o[i] = Vres_map[elim_o[i]];
+        elim_o.insert(elim_o.begin(), prefix_o.begin(), prefix_o.end());
+        H = H_old;
+#endif
+#ifdef OUTPUTTD
+        FHD FT(H, elim_o); 
+        // fprintf(fres, "elimination order: ");
+        // for(size_t i = 0; i < elim_o.size(); ++i)
+        //     fprintf(fres, "%lu ", elim_o[i]);
+        // fprintf(fres, "\n");
+        FT.Refine();
+        fprintf(ftd, "%lu\n", FT.X.size());
+        for(auto Xi: FT.X) {
+            vector <size_t> tmpV;
+            Xi.getelement(tmpV);
+            for(auto v: tmpV)
+                fprintf(ftd, "%s ", vname[v].c_str());
+            fprintf(ftd, "\n");
+        }
+        for(auto ei: FT.eg) 
+            fprintf(ftd, "%lu %lu\n", ei.first, ei.second);
+#endif
     }
+
     printf("%s: Finish\n", file_name.c_str());
     fprintf(fres, "fhw = %lf\n", fhw);
+    clock_t end = clock();
+    fprintf(fres, "total_time = %lf ms\n", 1000. *  (end - begin) / CLOCKS_PER_SEC);
     return 0;
 // #endif
 }
